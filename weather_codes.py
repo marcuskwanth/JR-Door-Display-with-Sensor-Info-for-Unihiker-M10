@@ -1,0 +1,66 @@
+# Open Weather weather codes for translation to Japanese and English. 
+
+weather_codes = {
+    # --- Group 2xx: Thunderstorm (雷雨) ---
+    200: ["小雨を伴う雷雨", "Thunderstorm, light rain"],
+    201: ["雨を伴う雷雨", "Thunderstorm, rain"],
+    202: ["大雨を伴う雷雨", "Thunderstorm, heavy rain"],
+    210: ["弱い雷雨", "Light thunderstorm"],
+    211: ["雷雨", "Thunderstorm"],
+    212: ["強い雷雨", "Heavy thunderstorm"],
+    221: ["荒れた雷雨", "Ragged thunderstorm"],
+    230: ["弱い霧雨を伴う雷雨", "Thunderstorm, light drizzle"],
+    231: ["霧雨を伴う雷雨", "Thunderstorm, drizzle"],
+    232: ["強い霧雨を伴う雷雨", "Thunderstorm, heavy drizzle"],
+    # --- Group 3xx: Drizzle (霧雨) ---
+    300: ["弱い霧雨", "Light drizzle"],
+    301: ["霧雨", "Drizzle"],
+    302: ["強い霧雨", "Heavy drizzle"],
+    310: ["弱い霧雨の雨", "Light drizzle rain"],
+    311: ["霧雨の雨", "Drizzle rain"],
+    312: ["強い霧雨の雨", "Heavy drizzle rain"],
+    313: ["にわか雨と霧雨", "Shower rain & drizzle"],
+    314: ["強いにわか雨と霧雨", "Heavy shower rain & drizzle"],
+    321: ["にわか霧雨", "Shower drizzle"],
+    # --- Group 5xx: Rain (雨) ---
+    500: ["小雨", "Light rain"],
+    501: ["適度な雨", "Moderate rain"],
+    502: ["強い雨", "Heavy intensity rain"],
+    503: ["非常に激しい雨", "Very heavy rain"],
+    504: ["猛烈な雨", "Extreme rain"],
+    511: ["着氷性の雨", "Freezing rain"],
+    520: ["弱い弱いにわか雨", "Light shower rain"],
+    521: ["にわか雨", "Shower rain"],
+    522: ["強いにわか雨", "Heavy shower rain"],
+    531: ["不規則なにわか雨", "Ragged shower rain"],
+    # --- Group 6xx: Snow (雪) ---
+    600: ["小雪", "Light snow"],
+    601: ["雪", "Snow"],
+    602: ["大雪", "Heavy snow"],
+    611: ["みぞれ", "Sleet"],
+    612: ["軽いにわかみぞれ", "Light shower sleet"],
+    613: ["にわかみぞれ", "Shower sleet"],
+    615: ["弱いみぞれ混じりの雨", "Light rain & snow"],
+    616: ["みぞれ混じりの雨", "Rain and snow"],
+    620: ["弱いにわか雪", "Light shower snow"],
+    621: ["にわか雪", "Shower snow"],
+    622: ["強いにわか雪", "Heavy shower snow"],
+    # --- Group 7xx: Atmosphere (大気状態) ---
+    701: ["薄霧", "Mist"],
+    711: ["煙", "Smoke"],
+    721: ["煙霧", "Haze"],
+    731: ["砂嵐・ほこり旋風", "Sand/dust whirls"],
+    741: ["霧", "Fog"],
+    751: ["砂", "Sand"],
+    761: ["ほこり", "Dust"],
+    762: ["火山灰", "Volcanic ash"],
+    771: ["突風", "Squalls"],
+    781: ["竜巻", "Tornado"],
+    # --- Group 800: Clear (快晴) ---
+    800: ["快晴", "Clear sky"],
+    # --- Group 80x: Clouds (曇り) ---
+    801: ["薄い曇り", "Few clouds"],
+    802: ["まばらな雲", "Scattered clouds"],
+    803: ["ちぎれ雲", "Broken clouds"],
+    804: ["曇天", "Overcast clouds"]
+}
