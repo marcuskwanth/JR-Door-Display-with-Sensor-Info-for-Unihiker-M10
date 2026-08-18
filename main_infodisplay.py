@@ -20,9 +20,13 @@ Board().begin()
 gui = GUI()
 width, height = 240, 320
 
-# Camera capture for middle panel 4
-camera_capture = cv2.VideoCapture(0)
-camera_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+# Camera capture for camera overlay
+def camera_init():
+    global camera_capture
+    camera_capture = cv2.VideoCapture(0)
+    camera_capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+camera_init()
 camera_view = None
 middle_panel_height = 200
 middle_panel_y = 70
@@ -248,7 +252,7 @@ def draw_layout_three(quotes):
     obj = gui.draw_rect(x=2, y=73, w=width-5, h=195, width=5, color="red")
     middle_panel_objects.append(obj)
     
-def draw_layout_four():
+def draw_camera_frame():
     global camera_view
     if camera_view is not None:
         return
@@ -260,12 +264,13 @@ def draw_layout_four():
 
 def update_camera_frame():
     global camera_view
-
     if camera_view is None or not camera_capture.isOpened():
+        camera_init()
         return
 
     ret, frame = camera_capture.read()
     if not ret:
+        camera_init()
         return
 
     h, w, _ = frame.shape
@@ -334,7 +339,7 @@ def draw_middle_display_thread():
         # Camera overlay takes priority and stays visible on top of all panels.
         if button_a_pressed:
             if camera_view is None:
-                draw_layout_four()
+                draw_camera_frame()
             update_camera_frame()
             time.sleep(0.03)
             continue
@@ -519,7 +524,7 @@ while True:
     if button_a.is_pressed() == True:
         button_a_pressed = not button_a_pressed
         if button_a_pressed:
-            draw_layout_four()
+            draw_camera_frame()
         else:
             display_version += 1
         time.sleep(0.2)
