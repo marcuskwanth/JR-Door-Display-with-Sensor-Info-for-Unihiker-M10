@@ -49,11 +49,17 @@ cur_sensor_temp = 0.0
 cur_sensor_humi = 0.0
 station_index = 0                   # Current station index in the stations list
 station_display_index = 0           # Current display layout index (0, 1, or 2)
+panel_index = 0                     # Current middle panel index (0 to 3)
 dest_index = 0
 last_station_change = time.time()
 display_version = 0                 # Display version counter to track changes and trigger updates
-button_a_pressed = False            # Flag to indicate if the button A is toggled (panel 3 or 4)
-button_b_pressed = False            # Flag to indicate if the button B is toggled (camera overlay)
+button_a_pressed = False            # Flag to indicate if the button A is toggled for camera overlay toggle
+button_b_pressed = False            # Flag to indicate if the button B is toggled for stopping panel cycling
+
+# Panel 4 specific Global Variables
+forth_panel_doors = []            # Specifically for panel 4 doors
+panel4_doors_open = False           # Whether doors in panel 4 have opened
+panel4_started_at = time.time()     # Time when the current middle panel started
 
 # ===== 1. Header Panel ===== 
 # Top bar
@@ -99,10 +105,18 @@ weather_cond = gui.draw_text(x=230, y=298, text="---", color="#AC41CC", font_siz
 # Clear the middle panel using object list
 def clear_middle_panel():
     global middle_panel_objects, camera_view
+    clear_forth_doors()
     for obj in middle_panel_objects:
         gui.remove(obj)
     middle_panel_objects.clear()
     camera_view = None
+
+# Clear the door object in panel 4 using object list 
+def clear_forth_doors():
+    global forth_panel_doors
+    for obj in forth_panel_doors:
+        gui.remove(obj)
+    forth_panel_doors.clear()
 
 # Panel 1
 def draw_layout_one(station):
@@ -224,12 +238,26 @@ def draw_layout_two(station):
     middle_panel_objects.append(obj)
     obj = gui.draw_line(x0=line3_start_x+14, y0=263, x1=line3_start_x, y1=253, color="red", width=4)
     middle_panel_objects.append(obj)
+    
+    # Interchange Line Infos 乗換えのご案内
+    obj = gui.draw_text(x=7, y=160, text="乗換えのご案内", color="#CCCCCC", font_size=8, origin="top_left")
+    middle_panel_objects.append(obj)
+    
+    interchange_lines = [("JE", "京葉線", "#D5192B"), ("JK", "京浜東北線", "#79C7E8"), ("JC", "中央線", "#F28C28")]
+    for line_number, (line_code, line_name, line_color) in enumerate(interchange_lines):
+        badge_y = 180 + line_number * 17
+        obj = gui.draw_rect(x=8, y=badge_y, w=13, h=13, width=2, color=line_color)
+        middle_panel_objects.append(obj)
+        obj = gui.draw_text(x=10, y=badge_y + 2, text=line_code, color="black", font_size=5, origin="top_left")
+        middle_panel_objects.append(obj)
+        obj = gui.draw_text(x=23, y=badge_y + 2, text=line_name, color="black", font_size=5, origin="top_left")
+        middle_panel_objects.append(obj)
         
     obj = gui.draw_text(x=5, y=134 + 110, 
                         text="のりかえ、待合せ時間は含まれません。\n電車により多少時間が異なります。", color="black", font_size=5)
     middle_panel_objects.append(obj)
         
-# Panel 3 (Default) and Panel 4 (after button toggle)
+# Panel 3
 def draw_layout_three(quotes):
     clear_middle_panel()
     selected_quote = random.choice(quotes) # Draw random quote
@@ -237,7 +265,8 @@ def draw_layout_three(quotes):
     separator_x0 = 25
     separator_x1 = 215
 
-    obj = gui.draw_text(x=120, y=83, text="Random Quote from Anime", color="red", font_size=10, origin="top")
+    obj = gui.draw_text(x=120, y=83, text=jp_or_en("アニメからのランダムな引用", "Random Quote from Anime"), 
+                        color="red", font_size=10, origin="top")
     middle_panel_objects.append(obj)
     obj = gui.draw_line(x0=separator_x0, y0=105, x1=separator_x1, y1=105, color="red", width=1)
     middle_panel_objects.append(obj)
@@ -245,12 +274,179 @@ def draw_layout_three(quotes):
     middle_panel_objects.append(obj)
     obj = gui.draw_line(x0=separator_x0, y0=218, x1=separator_x1, y1=218, color="#C4C4C4", width=1)
     middle_panel_objects.append(obj)
-    obj = gui.draw_text(x=120, y=223, w=width-text_x-15, text=selected_quote["name"], color="#0A3D0A", font_size=10, origin="top")
+    obj = gui.draw_text(x=120, y=223, w=width-text_x-15, text=jp_or_en(selected_quote["jp_name"], selected_quote["name"]), 
+                        color="#0A3D0A", font_size=10, origin="top")
     middle_panel_objects.append(obj)
     
     # Alert box
     obj = gui.draw_rect(x=2, y=73, w=width-5, h=195, width=5, color="red")
     middle_panel_objects.append(obj)
+    
+# Panel 4
+def draw_stairs_icon(x, y):
+    obj = gui.fill_rect(x=x+3, y=y+9, w=22, h=24, color="#F8F8F8")
+    middle_panel_objects.append(obj)
+    
+    for step in range(4):
+        obj = gui.draw_line(x0=x+4+(step*5), y0=y+29-(step*5), x1=x+9+(step*5), y1=y+29-(step*5), color="#24527A", width=2)
+        middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+4, y0=y+29, x1=x+19, y1=y+14, color="#24527A", width=2)
+    middle_panel_objects.append(obj)
+    
+    obj = gui.draw_line(x0=x+13, y0=y+9, x1=x+13, y1=y-16, color="black", width=1)
+    middle_panel_objects.append(obj)
+
+def draw_escalator_icon(x, y):
+    obj = gui.fill_rect(x=x+3, y=y+6, w=25, h=28, color="#F8F8F8")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.draw_line(x0=x+4, y0=y+29, x1=x+27, y1=y+9, color="#24527A", width=3)
+    middle_panel_objects.append(obj)
+    for step in range(4):
+        obj = gui.draw_line(x0=x+7+(step*5), y0=y+27-(step*4), x1=x+11+(step*5), y1=y+27-(step*4), color="white", width=1)
+        middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x + 4, y0=y + 32, x1=x + 28, y1=y + 12, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    
+    obj = gui.draw_line(x0=x+16, y0=y+6, x1=x+16, y1=y-16, color="black", width=1)
+    middle_panel_objects.append(obj)
+
+def draw_lift_icon(x, y):
+    obj = gui.fill_rect(x=x+10, y=y+9, w=12, h=23, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=x+10, y=y+9, w=12, h=23, width=1, color="#24527A")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+16, y0=y+14, x1=x+16, y1=y+26, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+13, y0=y+17, x1=x+16, y1=y+13, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+19, y0=y+17, x1=x+16, y1=y+13, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+13, y0=y+23, x1=x+16, y1=y+27, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=x+19, y0=y+23, x1=x+16, y1=y+27, color="#24527A", width=1)
+    middle_panel_objects.append(obj)
+    
+    obj = gui.draw_line(x0=x+15, y0=y+9, x1=x+15, y1=y-16, color="black", width=1)
+    middle_panel_objects.append(obj)
+
+def draw_arrow(x, y, direction, color, with_tail=True, door=False):
+    arrow_length = 10
+    head_length = 5
+    head_height = 6
+    if direction == "right":
+        tail_x = x - arrow_length
+        if with_tail:
+            obj = gui.draw_line(x0=tail_x, y0=y, x1=x, y1=y, color=color, width=3)
+            middle_panel_objects.append(obj) if not door else forth_panel_doors.append(obj)
+        head_lines = [(x - head_length, y - head_height, x, y+1), (x - head_length, y + head_height, x, y-1)]
+    elif direction == "left":
+        tail_x = x + arrow_length
+        if with_tail:
+            obj = gui.draw_line(x0=tail_x, y0=y, x1=x, y1=y, color=color, width=3)
+            middle_panel_objects.append(obj) if not door else forth_panel_doors.append(obj)
+        head_lines = [(x + head_length, y - head_height, x, y+1), (x + head_length, y + head_height, x, y-1)]
+    else:
+        raise ValueError("direction must be 'left' or 'right'")
+
+    for x0, y0, x1, y1 in head_lines:
+        obj = gui.draw_line(x0=x0, y0=y0, x1=x1, y1=y1, color=color, width=2 if with_tail else 3)
+        middle_panel_objects.append(obj) if not door else forth_panel_doors.append(obj)
+    
+def draw_layout_four(station):
+    clear_middle_panel()
+    
+    # Platform-like Illustration
+    obj = gui.fill_rect(x=0, y=105, w=width, h=70, color="#CCCCCC")
+    middle_panel_objects.append(obj)
+    obj = gui.fill_rect(x=0, y=175, w=width, h=8, color="#9C9C9C")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=0, y0=108, x1=width, y1=108, color="#E8ED5A", width=1)
+    middle_panel_objects.append(obj)
+    obj = gui.draw_line(x0=0, y0=172, x1=width, y1=172, color="#E8ED5A", width=1)
+    middle_panel_objects.append(obj)
+    
+    # Exit Infos
+    obj = gui.fill_rect(x=5, y=77, w=65, h=25, color="#FFF94D")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=5-1, y=77-1, w=65+1, h=25+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=37, y=77+2, text="ランダムな道路口", color="black", font_size=5, origin="top")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=37, y=77+14, text="Random Steet Gate", color="black", font_size=4, origin="top")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=80, y=77, w=65, h=25, color="#FFF94D")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=80-1, y=77-1, w=65+1, h=25+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=112, y=77+2, text="素晴らしい通り口", color="black", font_size=5, origin="top")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=112, y=77+14, text="Great Steet Gate", color="black", font_size=4, origin="top")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=176, y=77, w=55, h=25, color="#FFF94D")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=176-1, y=77-1, w=55+1, h=25+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=202, y=77+2, text="丸之內南口", color="black", font_size=5, origin="top")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=202, y=77+14, text="Marunouchi South Gate", color="black", font_size=3, origin="top")
+    middle_panel_objects.append(obj)
+
+    draw_stairs_icon(6, 119)
+    draw_escalator_icon(38, 119)
+    draw_lift_icon(92, 119)
+    draw_stairs_icon(124, 119)
+    draw_escalator_icon(184, 119)
+    
+    # Bottom half
+    obj = gui.fill_rect(x=0, y=215, w=width, h=55, color="#3EA3DE")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=155, y=225, text="こちら側のドアが開きます", color="white", font_size=9, origin="top")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=155, y=242, text="Doors on this side will open.", color="white", font_size=7, origin="top")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=18, y=254, w=37, h=6, color="#FFF700")
+    middle_panel_objects.append(obj)
+    
+    draw_layour_four_door()
+    
+    # Train Car Numbers
+    start_x_pos, dec_factor = 15, 20
+    car_idx = 11
+    for i in range(0, 11):
+        obj = gui.fill_rect(x=5+(dec_factor*i), y=188, w=18, h=20, color="red" if car_idx == 8 else "#F2F2F2")
+        middle_panel_objects.append(obj)
+        obj = gui.draw_rect(x=5+(dec_factor*i)-1, y=188-1, w=18+1, h=20+1, width=1, color="black")
+        middle_panel_objects.append(obj)
+        obj = gui.draw_text(x=start_x_pos, y=198, text=car_idx, 
+                            color="white" if car_idx == 8 else "black", font_size=10 if car_idx == 8 else 9, origin="center")
+        middle_panel_objects.append(obj)
+        start_x_pos += dec_factor
+        car_idx -= 1
+    draw_arrow(235, 198, "right", "black", with_tail=False, door=False)
+    
+def draw_layour_four_door():
+    clear_forth_doors()
+    
+    # Door Object
+    door_left_x = 5 if panel4_doors_open else 20
+    door_right_x = 53 if panel4_doors_open else 38
+
+    obj = gui.fill_rect(x=door_left_x, y=222, w=15, h=30, color="white") # LEFT
+    forth_panel_doors.append(obj)
+    obj = gui.fill_rect(x=door_left_x + 2, y=224, w=11, h=15, color="#83CCF7")
+    forth_panel_doors.append(obj)
+    obj = gui.fill_rect(x=door_right_x, y=222, w=15, h=30, color="white") # RIGHT
+    forth_panel_doors.append(obj)
+    obj = gui.fill_rect(x=door_right_x + 2, y=224, w=11, h=15, color="#83CCF7")
+    forth_panel_doors.append(obj)
+
+    if not panel4_doors_open:
+        draw_arrow(6, 237, "left", "white", with_tail=True, door=True)
+        draw_arrow(68, 237, "right", "white", with_tail=True, door=True)
     
 def draw_camera_frame():
     global camera_view
@@ -289,12 +485,14 @@ def update_camera_frame():
     camera_view.config(image=frame)
 
 def draw_middle_display(station, quotes):
-    if station_display_index == 0:
+    if panel_index == 0:
         draw_layout_one(station)
-    elif station_display_index == 1:
+    elif panel_index == 1:
         draw_layout_two(station)
-    else:
+    elif panel_index == 2:
         draw_layout_three(quotes)
+    else:
+        draw_layout_four(station)
 
 # ===== Multi-threading Functions ===== 
 def light_update():
@@ -306,13 +504,24 @@ def light_update():
         time.sleep(0.1)
 
 def station_cycle_update():
-    global station_index, station_display_index, last_station_change, display_version
+    global station_index, station_display_index, panel_index, panel4_doors_open
+    global panel4_started_at, last_station_change, display_version
     while True:
+        if panel_index == 3 and not panel4_doors_open and time.time() - panel4_started_at >= 3:
+            panel4_doors_open = True
+            draw_layour_four_door()
+
         # Check whether display cycles based on button b presses and time elapsed
         if not button_b_pressed and time.time() - last_station_change > 7:
-            station_display_index = (station_display_index + 1) % 3
-            if station_display_index == 0:
+            previous_panel_index = panel_index
+            panel_choices = [index for index in range(4) if index != previous_panel_index]
+            panel_index = random.choice(panel_choices)
+            panel4_doors_open = False
+            panel4_started_at = time.time()
+
+            if station_display_index == 2:
                 station_index = (station_index + 1) % len(stations)
+            station_display_index = (station_display_index + 1) % 3
             display_version += 1
             last_station_change = time.time()
         time.sleep(0.1)
@@ -414,7 +623,7 @@ def update_station_display(station):
     station_jy.config(text=station["jy"])
     
 def update_destination_display(station_idx):
-    if station_idx+1 in range(2,6):
+    if station_idx+1 in range(1,5):
         if station_display_index == 0 or station_display_index == 1:
             destination_jp1.config(text="\n上野・池袋")
             destination_jp2.config(text="\n\n方面")
@@ -425,7 +634,7 @@ def update_destination_display(station_idx):
             destination_jp2.config(text="")
             destination_en1.config(text="Bound for")
             destination_en2.config(text="\nUeno & \nIkebukuro")
-    elif station_idx+1 in range(6,14):
+    elif station_idx+1 in range(5,13):
         if station_display_index == 0 or station_display_index == 1:
             destination_jp1.config(text="\n池袋・新宿")
             destination_jp2.config(text="\n\n方面")
@@ -436,7 +645,7 @@ def update_destination_display(station_idx):
             destination_jp2.config(text="")
             destination_en1.config(text="Bound for")
             destination_en2.config(text="\nIkebukuro & \nShinjuku")
-    elif station_idx+1 in range(14,18):
+    elif station_idx+1 in range(13,17):
         if station_display_index == 0 or station_display_index == 1:
             destination_jp1.config(text="\n新宿・渋谷")
             destination_jp2.config(text="\n\n方面")
@@ -447,7 +656,7 @@ def update_destination_display(station_idx):
             destination_jp2.config(text="")
             destination_en1.config(text="Bound for")
             destination_en2.config(text="\nShinjuku & \nShibuya")
-    elif station_idx+1 in range(18,21):
+    elif station_idx+1 in range(17,20):
         if station_display_index == 0 or station_display_index == 1:
             destination_jp1.config(text="\n渋谷・品川")
             destination_jp2.config(text="\n\n方面")
@@ -458,7 +667,7 @@ def update_destination_display(station_idx):
             destination_jp2.config(text="")
             destination_en1.config(text="Bound for")
             destination_en2.config(text="\nShibuya & \nShinagawa")
-    elif station_idx+1 in range(21,26):
+    elif station_idx+1 in range(20,25):
         if station_display_index == 0 or station_display_index == 1:
             destination_jp1.config(text="\n品川・東京")
             destination_jp2.config(text="\n\n方面")
