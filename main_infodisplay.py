@@ -507,7 +507,7 @@ def station_cycle_update():
     global station_index, station_display_index, panel_index, panel4_doors_open
     global panel4_started_at, last_station_change, display_version
     while True:
-        if panel_index == 3 and not panel4_doors_open and time.time() - panel4_started_at >= 3:
+        if not button_a_pressed and panel_index == 3 and not panel4_doors_open and time.time() - panel4_started_at >= 3:
             panel4_doors_open = True
             draw_layour_four_door()
 
