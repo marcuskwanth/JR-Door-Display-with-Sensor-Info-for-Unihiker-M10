@@ -5,6 +5,7 @@ import time
 import cv2
 import requests
 import random
+import threading
 from datetime import datetime
 from PIL import Image
 from unihiker import GUI
@@ -15,6 +16,7 @@ from stop_list import jp_y, kana_y, en_y, stations
 from openweather_info import opw_url    # Add openweather_info.py separately and add the OpenWeather API key in there
 from weather_codes import weather_codes
 from ani_quotes import quotes
+from animelist import get_current_season, fetch_tv_seasonal_anime, assign_performance_text
 
 Board().begin()
 gui = GUI()
@@ -60,6 +62,12 @@ button_b_pressed = False            # Flag to indicate if the button B is toggle
 forth_panel_doors = []            # Specifically for panel 4 doors
 panel4_doors_open = False           # Whether doors in panel 4 have opened
 panel4_started_at = time.time()     # Time when the current middle panel started
+
+# Panel 5 specific Global Variables
+anime_info = None
+anime_info_lock = threading.Lock()
+anime_refresh_event = threading.Event()
+anime_refresh_event.set()
 
 # ===== 1. Header Panel ===== 
 # Top bar
@@ -122,7 +130,7 @@ def clear_forth_doors():
 def draw_layout_one(station):
     clear_middle_panel()
     border_x = 8
-    border_y = 134
+    border_y = 138
     border_w = 224
     border_h = 46
     
@@ -172,11 +180,11 @@ def draw_layout_one(station):
             text_y = dot_y + 12
             origin = "top_right"
 
-        obj = gui.draw_text(x=dot_x - 4, y=text_y, text=station_entry["kanji"], color="black", font_size=7, angle=90, origin=origin)
+        obj = gui.draw_text(x=dot_x - 4, y=text_y, text=jp_or_en(station_entry["kanji"], station_entry["en"]), 
+                            color="black", font_size=7, angle=90, origin=origin)
         middle_panel_objects.append(obj)
 
-    obj = gui.draw_text(x=5, y=134 + 110, 
-                        text="のりかえ、待合せ時間は含まれません。\n電車により多少時間が異なります。", color="black", font_size=5)
+    obj = gui.draw_text(x=5, y=134 + 110, text=jp_or_en("のりかえ、待合せ時間は含まれません。\n電車により多少時間が異なります。", "Transfer and waiting times are \nnot included. Times may differ by train"), color="black", font_size=5)
     middle_panel_objects.append(obj)
 
 # Panel 2
@@ -213,9 +221,9 @@ def draw_layout_two(station):
         if i == 0:
             label_x = dot_x + 22
         elif i == 1:
-            label_x = dot_x + 34
+            label_x = dot_x + 30
         else:
-            label_x = dot_x + 36
+            label_x = dot_x + 32
         label_y = dot_y
 
         #obj = gui.draw_text(x=label_x, y=label_y - 8, text=f"{station_entry['jy']}", color="black", font_size=8, origin="top_left")
@@ -229,9 +237,8 @@ def draw_layout_two(station):
         if i == len(dot_positions)-1:
             break
         
-        obj = gui.draw_text(x=label_x, y=label_y - 16, text=f"{station_entry['kanji']}", color="black", font_size=9, origin="top_left")
-        middle_panel_objects.append(obj)
-        obj = gui.draw_text(x=label_x, y=label_y + 0, text=f"{station_entry['en']}", color="black", font_size=7, origin="top_left")
+        obj = gui.draw_text(x=label_x, y=label_y - 10, 
+                            text=jp_or_en(station_entry['kanji'], station_entry['en']), color="black", font_size=9, origin="top_left")
         middle_panel_objects.append(obj)
 
     obj = gui.draw_line(x0=line3_start_x-15, y0=263, x1=line3_start_x, y1=253, color="red", width=4)
@@ -240,21 +247,24 @@ def draw_layout_two(station):
     middle_panel_objects.append(obj)
     
     # Interchange Line Infos 乗換えのご案内
-    obj = gui.draw_text(x=7, y=160, text="乗換えのご案内", color="#CCCCCC", font_size=8, origin="top_left")
+    obj = gui.draw_text(x=7, y=160, text=jp_or_en("乗換えのご案内", "Transfer for"), color="#CCCCCC", font_size=8, origin="top_left")
     middle_panel_objects.append(obj)
     
-    interchange_lines = [("JE", "京葉線", "#D5192B"), ("JK", "京浜東北線", "#79C7E8"), ("JC", "中央線", "#F28C28")]
-    for line_number, (line_code, line_name, line_color) in enumerate(interchange_lines):
+    interchange_lines = [
+        ("JE", "京葉線", "Keiyō Line", "#D5192B"), 
+        ("JK", "京浜東北線", "Keihin–Tōhoku Line", "#79C7E8"), 
+        ("JC", "中央線", "Chūō Line", "#F28C28")
+    ]
+    for line_number, (line_code, line_name_jp, line_name_en, line_color) in enumerate(interchange_lines):
         badge_y = 180 + line_number * 17
         obj = gui.draw_rect(x=8, y=badge_y, w=13, h=13, width=2, color=line_color)
         middle_panel_objects.append(obj)
         obj = gui.draw_text(x=10, y=badge_y + 2, text=line_code, color="black", font_size=5, origin="top_left")
         middle_panel_objects.append(obj)
-        obj = gui.draw_text(x=23, y=badge_y + 2, text=line_name, color="black", font_size=5, origin="top_left")
+        obj = gui.draw_text(x=25, y=badge_y + 2, text=jp_or_en(line_name_jp, line_name_en), color="black", font_size=5, origin="top_left")
         middle_panel_objects.append(obj)
         
-    obj = gui.draw_text(x=5, y=134 + 110, 
-                        text="のりかえ、待合せ時間は含まれません。\n電車により多少時間が異なります。", color="black", font_size=5)
+    obj = gui.draw_text(x=5, y=134 + 110, text=jp_or_en("のりかえ、待合せ時間は含まれません。\n電車により多少時間が異なります。", "Transfer and waiting times are \nnot included. Times may differ by train"), color="black", font_size=5)
     middle_panel_objects.append(obj)
         
 # Panel 3
@@ -447,7 +457,107 @@ def draw_layour_four_door():
     if not panel4_doors_open:
         draw_arrow(6, 237, "left", "white", with_tail=True, door=True)
         draw_arrow(68, 237, "right", "white", with_tail=True, door=True)
+
+# Panel 5
+def draw_layout_five(station):
+    clear_middle_panel()
     
+    obj = gui.fill_rect(x=0, y=90, w=width, h=179, color="#EDEDED")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=120, y=73, text="動画情報 Anime Information", color="black", font_size=8, origin="top")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=3, y=105, w=60, h=40, color="#C7C9FF")
+    middle_panel_objects.append(obj)
+    obj = gui.fill_rect(x=63, y=105, w=174, h=40, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=3-1, y=105-1, w=234+1, h=40+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=3+3, y=105+20, text="Anime", color="black", font_size=8, origin="left")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=3, y=145, w=60, h=20, color="#C7C9FF")
+    middle_panel_objects.append(obj)
+    obj = gui.fill_rect(x=63, y=145, w=174, h=20, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=3-1, y=145-1, w=234+1, h=20+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=3+3, y=145+10, text="Season", color="black", font_size=8, origin="left")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=3, y=165, w=60, h=40, color="#C7C9FF")
+    middle_panel_objects.append(obj)
+    obj = gui.fill_rect(x=63, y=165, w=174, h=40, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=3-1, y=165-1, w=234+1, h=40+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=3+3, y=165+20, text="Genre(s)", color="black", font_size=8, origin="left")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=3, y=205, w=60, h=20, color="#C7C9FF")
+    middle_panel_objects.append(obj)
+    obj = gui.fill_rect(x=63, y=205, w=174, h=20, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_rect(x=3-1, y=205-1, w=234+1, h=20+1, width=1, color="black")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=3+3, y=205+10, text="Rating", color="black", font_size=8, origin="left")
+    middle_panel_objects.append(obj)
+    
+    obj = gui.draw_line(x0=63, y0=105, x1=63, y1=205+20, color="black", width=1)
+    middle_panel_objects.append(obj)
+    
+    obj = gui.fill_rect(x=210, y=250, w=25, h=12, color="white")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=215, y=250+6, text="1/1", color="black", font_size=8, origin="left")
+    middle_panel_objects.append(obj)
+
+    title, current_season, current_year, genres, score = get_random_anime_info()
+
+    obj = gui.draw_text(x=63+5, y=105+20, w=234-63-5, text=title, color="black", font_size=7, origin="left")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=63+5, y=145+10, w=234-63-5, text=f"{current_season} {current_year}", color="black", font_size=7, origin="left")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=63+5, y=165+20, w=234-63-5, text=genres, color="black", font_size=7, origin="left")
+    middle_panel_objects.append(obj)
+    obj = gui.draw_text(x=63+5, y=205+10, 
+                        text=f"{score} - {assign_performance_text(score)} (Source: anilist.co)", color="black", font_size=7, origin="left")
+    middle_panel_objects.append(obj)
+    anime_refresh_event.set()
+
+def draw_random_anime_info():
+    global anime_info
+
+    while True:
+        anime_refresh_event.wait()
+        anime_refresh_event.clear()
+
+        try:
+            current_season = get_current_season()
+            current_year = datetime.now().year
+            tv_list = fetch_tv_seasonal_anime(current_season, current_year)
+            if not tv_list:
+                continue
+
+            selected_anime = random.choice(tv_list)
+            title_data = selected_anime.get("title", {})
+            title = title_data.get("english") or title_data.get("romaji", "Unknown")
+            genres = ", ".join(selected_anime.get("genres", [])) or "No genres"
+            score = selected_anime.get("averageScore")
+
+            with anime_info_lock:
+                anime_info = (title, current_season, current_year, genres, score)
+        except Exception as error:
+            print(f"Anime info update error: {error}")
+
+def get_random_anime_info():
+    with anime_info_lock:
+        cached_info = anime_info
+
+    if cached_info is None:
+        return "Loading...", get_current_season(), datetime.now().year, "Loading...", None
+
+    return cached_info
+
 def draw_camera_frame():
     global camera_view
     if camera_view is not None:
@@ -491,8 +601,10 @@ def draw_middle_display(station, quotes):
         draw_layout_two(station)
     elif panel_index == 2:
         draw_layout_three(quotes)
-    else:
+    elif panel_index == 3:
         draw_layout_four(station)
+    else:
+        draw_layout_five(station)
 
 # ===== Multi-threading Functions ===== 
 def light_update():
@@ -514,7 +626,7 @@ def station_cycle_update():
         # Check whether display cycles based on button b presses and time elapsed
         if not button_b_pressed and time.time() - last_station_change > 7:
             previous_panel_index = panel_index
-            panel_choices = [index for index in range(4) if index != previous_panel_index]
+            panel_choices = [index for index in range(5) if index != previous_panel_index]
             panel_index = random.choice(panel_choices)
             panel4_doors_open = False
             panel4_started_at = time.time()
@@ -692,6 +804,7 @@ def update_destination_display(station_idx):
 
 # ===== 6. Main Program Loop===== 
 # Initialize the displays
+gui.start_thread(draw_random_anime_info)
 gui.start_thread(station_cycle_update)
 gui.start_thread(update_station_display_thread)
 gui.start_thread(update_destination_display_thread)
