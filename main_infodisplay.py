@@ -42,24 +42,27 @@ BG_COLOR = "#1F1F30"
 LINE_COLOR = "#9BCB45" # Yamanote Green
 CAR_NO = "8"
 
-# Global Variables
+# Global GUI Variables 
 middle_panel_objects = []
+
+# Hardware Sensor Variables
 last_weather_update = 0
 last_sensor_update = 0
 cur_weather_cond = ["---", "---"]
 cur_sensor_temp = 0.0
 cur_sensor_humi = 0.0
-station_index = 0                   # Current station index in the stations list
-station_display_index = 0           # Current display layout index (0, 1, or 2)
-panel_index = 0                     # Current middle panel index (0 to 3)
-dest_index = 0
-last_station_change = time.time()
-display_version = 0                 # Display version counter to track changes and trigger updates
 button_a_pressed = False            # Flag to indicate if the button A is toggled for camera overlay toggle
 button_b_pressed = False            # Flag to indicate if the button B is toggled for stopping panel cycling
 
+# Station / Panel Variables
+station_index = 0                   # Current station index in the stations list
+station_display_index = 0           # Current station language index (0, 1, or 2)
+panel_index = 0                     # Current middle panel index (0 to 4)
+last_station_change = time.time()
+display_version = 0                 # Display version counter to track changes and trigger updates
+
 # Panel 4 specific Global Variables
-forth_panel_doors = []            # Specifically for panel 4 doors
+forth_panel_doors = []              # Specifically for panel 4 doors
 panel4_doors_open = False           # Whether doors in panel 4 have opened
 panel4_started_at = time.time()     # Time when the current middle panel started
 
@@ -79,7 +82,6 @@ destination_en1 = gui.draw_text(x=5, y=22, text="---", color="white", font_size=
 destination_en2 = gui.draw_text(x=5, y=21, text="---", color="white", font_size=8)
 destination_jp1 = gui.draw_text(x=5, y=16, text="", color="white", font_size=10)
 destination_jp2 = gui.draw_text(x=52, y=22, text="", color="white", font_size=8)
-#line_type = gui.draw_text(x=10, y=25, text="LOCAL 各駅", color="yellow", font_size=10)
 
 # Right side
 # Top section
@@ -546,8 +548,8 @@ def draw_random_anime_info():
 
             with anime_info_lock:
                 anime_info = (title, current_season, current_year, genres, score)
-        except Exception as error:
-            print(f"Anime info update error: {error}")
+        except Exception as e:
+            print(f"Anime info update error: {e}")
 
 def get_random_anime_info():
     with anime_info_lock:

@@ -60,14 +60,18 @@ def get_current_season():
 
 def assign_performance_text(score):
     if score is None:
-        return "No score available"
+        return "N/A"
     elif score >= 90:
+        return "Masterpiece"
+    elif score >= 80:
         return "Great"
-    elif score >= 75:
+    elif score >= 70:
         return "Good"
-    elif score >= 50:
+    elif score >= 60:
         return "Fine"
-    elif score >= 40:
+    elif score >= 50:
         return "Average"
+    elif score >= 40:
+        return "Bad"
     else:
         return "Poor"
